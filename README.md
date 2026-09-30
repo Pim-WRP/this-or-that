@@ -11,13 +11,19 @@ Mind dump, then sort your tasks two at a time. An installable web app (PWA) that
 
 Always open it from the home-screen icon. On iPhone the icon has its own storage, separate from Safari.
 
+## Adding tasks
+
+One task per box: **A**, **B**, then **+ Add another** (or press Enter in the last box).
+
+To empty your head by talking instead: tap **Copy prompt for your AI**, paste it into ChatGPT, Claude
+or any assistant, ramble to it (its voice dictation works well), then copy its lettered list and paste
+it into a box. A pasted list fills one box per line; the `A.` / `1.` / `-` markers, chat around the
+list, and tasks already in a box are dropped. Boxes are kept on the phone until you start sorting.
+
 ## Privacy
 
 Your list is stored only on the phone (`localStorage`). No accounts, no server, no tracking.
-Two optional features talk to the internet:
-
-- **Claude API key** (Settings): if you add one, "Make it a list" sends what you typed to Anthropic. Without a key, the text is split on the phone.
-- **Talk button:** uses the phone's speech recognition. On Android, Chrome may send audio to Google.
+The app makes no network requests after it's installed; your AI assistant only sees what you paste into it.
 
 ## Markdown export / import
 

@@ -62,12 +62,6 @@ h1,h2,.display{
 .screen.on{display:block}
 h1{font-size:40px; font-weight:800; margin:22px 0 8px}
 .sub{color:var(--muted); margin:0 0 18px}
-textarea{
-  width:100%; min-height:40vh; resize:vertical; border:2px solid var(--line);
-  border-radius:14px; background:var(--card); color:var(--ink);
-  padding:14px 16px; font:inherit; line-height:1.7; margin-bottom:14px;
-}
-textarea::placeholder{color:var(--muted); opacity:.7}
 :focus-visible{outline:3px solid var(--win); outline-offset:2px}
 .btn{
   appearance:none; border:0; font:inherit; font-weight:700; border-radius:999px;
@@ -77,9 +71,14 @@ textarea::placeholder{color:var(--muted); opacity:.7}
 .btn[disabled]{opacity:.35; cursor:default}
 .btn.ghost{background:transparent; color:var(--ink); border:2px solid var(--line)}
 .btn.small{font-size:16px; padding:11px 16px}
-.voice{display:flex; gap:10px; margin-bottom:12px}
-.voice .btn{flex:1; margin:0}
-.btn.mic.on{background:var(--win); color:var(--win-ink); border-color:var(--win)}
+.boxes{list-style:none; padding:0; margin:4px 0 0}
+.box{display:flex; align-items:center; gap:8px; margin-bottom:10px}
+.box .lt{font-family:'Bricolage Grotesque', system-ui, sans-serif; font-weight:800; color:var(--muted); width:30px; text-align:center; flex:none}
+.box .field{margin:0; flex:1; min-width:0}
+.box .rm{border:0; background:transparent; color:var(--muted); font:inherit; font-size:24px; line-height:1; width:36px; height:44px; border-radius:99px; cursor:pointer; flex:none}
+.box .rm:hover{color:var(--drop)}
+.box .rm[hidden]{display:block; visibility:hidden}
+#addBox{margin:0 0 18px}
 .status{font-size:14px; color:var(--muted); min-height:21px; margin:-2px 0 10px}
 .note{background:var(--soft); border-radius:12px; padding:10px 14px; color:var(--muted); font-size:15px; margin-bottom:14px}
 
@@ -158,14 +157,12 @@ details li{text-decoration:line-through; padding:3px 0; overflow-wrap:anywhere}
   <!-- Mind dump -->
   <section class="screen" id="s-dump">
     <h1>What's on your plate?</h1>
-    <p class="sub">Type it or say it. Get everything out; don't sort yet.</p>
+    <p class="sub">One thing per box. Or copy the prompt, ramble to your own AI, and paste its list.</p>
     <div class="note" id="carry" hidden></div>
-    <textarea id="dump" placeholder="Reply to the landlord&#10;Film Tuesday's class&#10;Groceries&#10;&#10;Or tap Talk and just ramble." aria-label="Your tasks, one per line"></textarea>
-    <div class="voice">
-      <button class="btn ghost small mic" id="mic" type="button" hidden>🎙 Talk</button>
-      <button class="btn ghost small" id="tidy" type="button" disabled>Make it a list</button>
-    </div>
+    <button class="btn ghost small" id="copyPrompt" type="button">Copy prompt for your AI</button>
     <div class="status" id="vstatus" aria-live="polite"></div>
+    <ol class="boxes" id="boxes"></ol>
+    <button class="btn ghost small" id="addBox" type="button">+ Add another</button>
     <button class="btn" id="go" disabled>Start sorting</button>
     <button class="btn ghost" id="back" hidden>Back to my list</button>
   </section>
@@ -228,15 +225,6 @@ details li{text-decoration:line-through; padding:3px 0; overflow-wrap:anywhere}
       <button class="btn ghost" id="impReplace" type="button">Replace my list</button>
     </div>
     <div class="status" id="iostatus" aria-live="polite"></div>
-
-    <h2>Claude (optional)</h2>
-    <p class="sub">Paste an Anthropic API key and "Make it a list" will use Claude to pull the tasks out of what you said. The key is kept only on this phone and sent only to Anthropic. Without a key, the app splits the text itself.</p>
-    <input class="field" id="apikey" type="text" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="sk-ant-…" aria-label="Anthropic API key">
-    <div class="row">
-      <button class="btn small" id="keySave" type="button">Save key</button>
-      <button class="btn ghost small" id="keyClear" type="button">Remove key</button>
-    </div>
-    <div class="status" id="keystatus" aria-live="polite"></div>
 
     <button class="btn ghost" id="setBack" type="button">Back</button>
   </section>
@@ -406,173 +394,155 @@ details li{text-decoration:line-through; padding:3px 0; overflow-wrap:anywhere}
     save(); render(i === 0);
   }
 
-  // ---- Dump screen ----
+  // ---- Dump screen: one box per task ----
+  var DRAFT = 'this-or-that-draft';
+  var HINTS = ['Reply to the landlord', "Film Tuesday's class", 'Groceries'];
+  var PROMPT =
+    "Next I'll ramble about everything on my plate. When I've sent it, turn it into a to-do list:\n" +
+    '- One line per separate task or errand, lettered A, B, C…\n' +
+    '- Short, starting with a verb where natural (e.g. "Call the dentist").\n' +
+    "- Keep my own words and language; don't translate.\n" +
+    '- Keep specifics: names, dates, amounts, places.\n' +
+    "- Leave out feelings, filler and commentary that aren't tasks.\n" +
+    "- Don't invent tasks. Merge duplicates.\n" +
+    '- Reply with only the list, nothing else, so I can copy it.';
+
+  // The Claude key feature was removed; clear anything an earlier version stored.
+  try { localStorage.removeItem('this-or-that-apikey'); localStorage.removeItem('this-or-that-apierr'); } catch(e){}
+
+  function vstatus(t){ $('vstatus').textContent = t || ''; }
+
+  // A, B … Z, AA, AB …
+  function letter(i){ var s = ''; i++; while (i > 0){ var r = (i - 1) % 26; s = String.fromCharCode(65 + r) + s; i = (i - r - 1) / 26; } return s; }
+
+  function inputs(){ return Array.prototype.slice.call($('boxes').querySelectorAll('input')); }
+
+  function addBox(value){
+    var li = document.createElement('li'); li.className = 'box';
+    var lt = document.createElement('span'); lt.className = 'lt'; lt.setAttribute('aria-hidden', 'true');
+    var inp = document.createElement('input'); inp.className = 'field'; inp.type = 'text'; inp.autocomplete = 'off';
+    inp.setAttribute('enterkeyhint', 'next');
+    inp.value = value || '';
+    var rm = document.createElement('button'); rm.className = 'rm'; rm.type = 'button'; rm.textContent = '×';
+    rm.addEventListener('click', function(){ removeBox(li); });
+    inp.addEventListener('input', boxesChanged);
+    inp.addEventListener('keydown', function(e){
+      if (e.key !== 'Enter' || e.isComposing) return;
+      e.preventDefault();
+      var all = inputs();
+      (all[all.indexOf(inp) + 1] || addBox()).focus();
+      boxesChanged();
+    });
+    inp.addEventListener('paste', function(e){ pasteList(e, inp); });
+    li.appendChild(lt); li.appendChild(inp); li.appendChild(rm);
+    $('boxes').appendChild(li);
+    relabel();
+    return inp;
+  }
+
+  function removeBox(li){
+    li.remove();
+    while (inputs().length < 2) addBox();
+    boxesChanged();
+  }
+
+  function relabel(){
+    inputs().forEach(function(inp, i){
+      var li = inp.parentNode, L = letter(i), rm = li.querySelector('.rm');
+      li.querySelector('.lt').textContent = L;
+      inp.setAttribute('aria-label', 'Task ' + L);
+      inp.placeholder = HINTS[i] || '';
+      rm.setAttribute('aria-label', 'Remove ' + L);
+      rm.hidden = i < 2 && !inp.value.trim();   // A and B always stay; extra empty boxes can go
+    });
+  }
+
+  function setBoxes(values){
+    $('boxes').innerHTML = '';
+    values.forEach(function(v){ addBox(v); });
+    while (inputs().length < 2) addBox();
+  }
+
+  // Saved on every change: the phone may reload the app while you're in your AI app.
+  function boxesChanged(){
+    relabel(); updateGo();
+    try { localStorage.setItem(DRAFT, JSON.stringify(inputs().map(function(i){ return i.value; }))); } catch(e){}
+  }
+
+  // A pasted list (your AI's answer) fills one box per line, without the "A." / "1." / "-" markers.
+  var MARK = /^(?:\*\*)?(?:[-*•+]|\(?(?:[A-Za-z]|[A-Z]{2})[.)]|\(?\d+[.)])(?:\*\*)?\s+/;
+  function listItems(text){
+    var rows = text.split(/\r?\n/).map(function(s){ return s.trim(); }).filter(Boolean);
+    var marked = rows.filter(function(s){ return MARK.test(s); });
+    if (marked.length >= 2){
+      // Keep only the list lines, which drops chat like "Here's your list:"
+      rows = marked.map(function(s){ return s.replace(MARK, '').replace(/^\[[ xX]\]\s+/, ''); });
+    }
+    return rows.map(function(s){ return s.replace(/\*\*(.+?)\*\*/g, '$1').trim(); }).filter(Boolean);
+  }
+  function pasteList(e, inp){
+    var items = listItems((e.clipboardData && e.clipboardData.getData('text')) || '');
+    if (items.length < 2) return;   // a single line pastes normally
+    e.preventDefault();
+    var all = inputs(), i = all.indexOf(inp) + (inp.value.trim() ? 1 : 0), have = {};
+    all.forEach(function(b){ have[b.value.trim().toLowerCase()] = 1; });
+    items = items.filter(function(t){ var k = t.toLowerCase(); if (have[k]) return false; have[k] = 1; return true; });
+    items.forEach(function(t){
+      while (all[i] && all[i].value.trim()) i++;
+      var target = all[i] || addBox();
+      target.value = t;
+      all = inputs(); i = all.indexOf(target) + 1;
+    });
+    boxesChanged();
+    vstatus(items.length ? 'Added ' + items.length + (items.length === 1 ? ' task' : ' tasks') + '. Fix anything that looks off, then start sorting.' : 'Those tasks are already here.');
+  }
+
   function lines(){
     var seen = {};
-    return $('dump').value.split('\n').map(function(s){ return s.trim(); }).filter(function(s){
+    return inputs().map(function(i){ return i.value.trim(); }).filter(function(s){
       var k = s.toLowerCase(); if (!s || seen[k]) return false; seen[k] = 1; return true;
     });
   }
   function updateGo(){
     var n = lines().length;
     $('go').disabled = n === 0;
-    $('tidy').disabled = !$('dump').value.trim() || tidying || listening;
     $('go').textContent = n ? 'Start sorting (' + n + ')' : 'Start sorting';
   }
-  // ---- Voice + tidy into a list ----
-  var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-  var rec = null, listening = false, tidying = false, heard = false, base = '';
-  var MIC_OFF = "The microphone isn't available here. Tap the mic on your keyboard instead.";
-  var micOff = !SR;
-  // Once the mic is unavailable, the keyboard-dictation hint is the resting status.
-  function vstatus(t){ $('vstatus').textContent = t || (micOff ? MIC_OFF : ''); }
-  function micUnavailable(){ micOff = true; $('mic').hidden = true; vstatus(MIC_OFF); }
 
-  if (SR){ $('mic').hidden = false; } else vstatus('');
-  $('mic').addEventListener('click', function(){ listening ? stopMic() : startMic(); });
-
-  function startMic(){
-    try {
-      rec = new SR();
-      rec.lang = navigator.language || 'en-US';
-      rec.continuous = true; rec.interimResults = true;
-      base = $('dump').value.trim(); if (base) base += '\n';
-      heard = false;
-      rec.onresult = function(e){
-        var fin = '', interim = '';
-        for (var i = 0; i < e.results.length; i++){
-          var r = e.results[i];
-          if (r.isFinal) fin += r[0].transcript + ' '; else interim += r[0].transcript;
-        }
-        if ((fin + interim).trim()) heard = true;
-        $('dump').value = base + fin + interim;
-        updateGo();
-      };
-      rec.onerror = function(e){
-        if (e.error === 'not-allowed' || e.error === 'service-not-allowed' || e.error === 'audio-capture'){
-          micUnavailable();
-        } else if (e.error !== 'no-speech' && e.error !== 'aborted'){
-          vstatus('Voice stopped (' + e.error + '). Tap Talk to try again.');
-        }
-      };
-      rec.onend = function(){
-        listening = false; $('mic').classList.remove('on'); $('mic').textContent = '🎙 Talk';
-        updateGo();
-        if (heard){ heard = false; tidy(); }
-        else if ($('vstatus').textContent !== MIC_OFF) vstatus('');
-      };
-      rec.start();
-      listening = true; $('mic').classList.add('on'); $('mic').textContent = '■ Done talking';
-      vstatus('Listening. Say everything, then tap Done talking.');
-      updateGo();
-    } catch(err){
-      micUnavailable();
+  $('copyPrompt').addEventListener('click', function(){
+    function copied(){ vstatus('Prompt copied. Paste it into your AI app and ramble. Then copy its list and paste it into a box here.'); }
+    function fallback(){
+      var ta = document.createElement('textarea'); ta.value = PROMPT; ta.setAttribute('readonly', '');
+      ta.style.position = 'fixed'; ta.style.opacity = '0'; document.body.appendChild(ta);
+      ta.select(); ta.setSelectionRange(0, PROMPT.length);
+      var ok = false; try { ok = document.execCommand('copy'); } catch(e){}
+      ta.remove();
+      ok ? copied() : vstatus("Couldn't copy on this phone. Try again, or type your tasks in the boxes.");
     }
-  }
-  function stopMic(){ try { rec && rec.stop(); } catch(e){} }
+    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(PROMPT).then(copied, fallback);
+    else fallback();
+  });
+  $('addBox').addEventListener('click', function(){ addBox().focus(); boxesChanged(); });
 
-  function localSplit(text){
-    return text
-      .split(/\n|[.!?;]+\s+|,?\s+and then\s+|,\s*then\s+|\s+also\s+/i)
-      .map(function(s){
-        return s.replace(/^\s*(um+|uh+|so|okay|ok|and|then|also)\b[,\s]*/i, '')
-                .replace(/^(i\s+(need|have|want|should)\s+to|i\s+gotta|gotta|need\s+to|have\s+to)\s+/i, '')
-                .replace(/[.,\s]+$/, '').trim();
-      })
-      .filter(function(s){ return s.length > 1; })
-      .map(function(s){ return s.charAt(0).toUpperCase() + s.slice(1); });
-  }
+  var draft = null;
+  try { draft = JSON.parse(localStorage.getItem(DRAFT) || 'null'); } catch(e){}
+  setBoxes(Array.isArray(draft) ? draft.filter(function(v){ return typeof v === 'string'; }) : []);
 
-  // ---- Optional Claude call: only with the user's own key; any failure falls back to localSplit ----
-  var API_KEY = 'this-or-that-apikey', API_ERR = 'this-or-that-apierr';
-  var MODEL = 'claude-haiku-4-5';
-  function getKey(){ try { return localStorage.getItem(API_KEY) || ''; } catch(e){ return ''; } }
-  function noteApi(err){ try { err ? localStorage.setItem(API_ERR, err) : localStorage.removeItem(API_ERR); } catch(e){} }
-
-  function parseJsonLoose(s){
-    try { return JSON.parse(s); } catch(e){}
-    var m = s.match(/\{[\s\S]*\}|\[[\s\S]*\]/);
-    return m ? JSON.parse(m[0]) : null;
-  }
-
-  async function claudeTasks(text){
-    var key = getKey();
-    if (!key) return null;
-    var prompt =
-      'You turn a spoken or typed brain dump into a to-do list.\n' +
-      'Rules:\n' +
-      '- One entry per distinct task or errand.\n' +
-      '- Short, starting with a verb where natural (e.g. "Call the dentist").\n' +
-      "- Keep the speaker's own words and language; do not translate.\n" +
-      '- Keep specifics: names, dates, amounts, places.\n' +
-      '- Drop filler, feelings and commentary that are not tasks.\n' +
-      '- Do not invent tasks. Merge duplicates.\n' +
-      '- Lines that are already short tasks stay as they are.\n' +
-      'Return only JSON in this shape: {"tasks": ["...", "..."]}\n\n' +
-      'Brain dump (between the markers):\n<<<\n' + text + '\n>>>';
-    var ctrl = new AbortController();
-    var timer = setTimeout(function(){ ctrl.abort(); }, 20000);
-    try {
-      var res = await fetch('https://api.anthropic.com/v1/messages', {
-        method: 'POST', signal: ctrl.signal,
-        headers: {
-          'content-type': 'application/json',
-          'x-api-key': key,
-          'anthropic-version': '2023-06-01',
-          'anthropic-dangerous-direct-browser-access': 'true'
-        },
-        body: JSON.stringify({model: MODEL, max_tokens: 4096, messages: [{role: 'user', content: prompt}]})
-      });
-      var data = await res.json().catch(function(){ return null; });
-      if (!res.ok) throw new Error((data && data.error && data.error.message) || ('HTTP ' + res.status));
-      var reply = ((data && data.content) || []).filter(function(b){ return b.type === 'text'; }).map(function(b){ return b.text; }).join('');
-      var out = parseJsonLoose(reply);
-      var arr = Array.isArray(out) ? out : (out && out.tasks);
-      if (!Array.isArray(arr)) throw new Error("Claude's reply wasn't a list");
-      return arr.filter(function(x){ return typeof x === 'string' && x.trim(); }).map(function(x){ return x.trim(); });
-    } finally {
-      clearTimeout(timer);
-    }
-  }
-
-  function apiErrText(e){
-    if (e && e.name === 'AbortError') return 'Claude took too long to answer.';
-    if (e instanceof TypeError) return 'Could not reach Claude (offline?).';
-    return (e && e.message) || 'Unknown error.';
-  }
-
-  async function tidy(){
-    var text = $('dump').value.trim();
-    if (!text || tidying) return;
-    tidying = true; updateGo();
-    $('tidy').textContent = 'Making a list…';
-    vstatus('Turning that into separate tasks…');
-    var tasks = null;
-    try {
-      tasks = await claudeTasks(text);
-      if (tasks) noteApi('');
-    } catch(e){ tasks = null; noteApi(apiErrText(e)); }
-    var usedLocal = !tasks || !tasks.length;
-    if (usedLocal) tasks = localSplit(text);
-    $('dump').value = tasks.join('\n');
-    tidying = false; $('tidy').textContent = 'Make it a list';
-    vstatus(usedLocal ? 'Split into lines. Fix anything that looks off, then start sorting.' : 'Here is your list. Edit anything, then start sorting.');
-    updateGo();
-  }
-  $('tidy').addEventListener('click', tidy);
-
-  $('dump').addEventListener('input', updateGo);
   $('go').addEventListener('click', function(){
     var items = lines(); if (!items.length) return;
     items.forEach(function(t){ S.queue.push({id:uid(), text:t}); });
-    $('dump').value = ''; S.hist = []; S.compares = 0;
+    setBoxes([]); boxesChanged(); vstatus('');
+    S.hist = []; S.compares = 0;
     next();
   });
   $('back').addEventListener('click', function(){ S.screen = 'result'; save(); render(); });
 
   // ---- Result actions ----
   $('firstDone').addEventListener('click', function(){ if (S.ranked[0]) markDone(S.ranked[0].id); });
-  $('more').addEventListener('click', function(){ S.screen = 'dump'; save(); render(); setTimeout(function(){ $('dump').focus(); }, 50); });
+  $('more').addEventListener('click', function(){
+    S.screen = 'dump'; save(); render();
+    setTimeout(function(){ var all = inputs(); (all.filter(function(i){ return !i.value.trim(); })[0] || all[0]).focus(); }, 50);
+  });
   var freshTimer = null;
   function resetFresh(){ clearTimeout(freshTimer); $('fresh').textContent = 'Start fresh'; $('fresh').dataset.armed = ''; }
   $('fresh').addEventListener('click', function(){
@@ -648,31 +618,12 @@ details li{text-decoration:line-through; padding:3px 0; overflow-wrap:anywhere}
   // ---- Settings ----
   function openSettings(on){
     settingsOpen = on;
-    if (on){ showKeyStatus(); resetImport(); iostatus(''); }
+    if (on){ resetImport(); iostatus(''); }
     render();
     window.scrollTo(0, 0);
   }
   $('gear').addEventListener('click', function(){ openSettings(!settingsOpen); });
   $('setBack').addEventListener('click', function(){ openSettings(false); });
-
-  function showKeyStatus(){
-    var k = getKey(), err = '';
-    try { err = localStorage.getItem(API_ERR) || ''; } catch(e){}
-    $('keystatus').textContent = k
-      ? 'Key saved on this phone (ends in …' + k.slice(-4) + ').' + (err ? " Last try didn't work (" + err.replace(/[.\s]+$/, '') + '), so the app split the text itself.' : '')
-      : 'No key saved.';
-    $('keyClear').disabled = !k;
-  }
-  $('keySave').addEventListener('click', function(){
-    var k = $('apikey').value.trim();
-    if (!k){ $('keystatus').textContent = 'Paste your key first.'; return; }
-    try { localStorage.setItem(API_KEY, k); } catch(e){}
-    noteApi(''); $('apikey').value = ''; showKeyStatus();
-  });
-  $('keyClear').addEventListener('click', function(){
-    try { localStorage.removeItem(API_KEY); } catch(e){}
-    noteApi(''); showKeyStatus();
-  });
 
   // ---- Markdown export ----
   function iostatus(t){ $('iostatus').textContent = t || ''; }
