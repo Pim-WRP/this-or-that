@@ -11,6 +11,17 @@ Mind dump, then sort your tasks two at a time. An installable web app (PWA) that
 
 Always open it from the home-screen icon. On iPhone the icon has its own storage, separate from Safari.
 
+## How it works
+
+1. **Add tasks** in the boxes (see below) and tap **Start sorting**.
+2. **Shall I do this today?** Each new task gets **Today**, **Later** or **Drop it**.
+3. **Which matters more right now?** Only the Today tasks are compared, two at a time.
+4. The result is **today's list** in order. Later tasks wait in a **Later** list below it
+   (tap **Today** on one to sort it in); the next day they come up again with the next batch of new tasks.
+
+During sorting, **+ Add more** pauses the sort, lets you add boxes, asks today-or-later for just
+those, and continues where you left off.
+
 ## Adding tasks
 
 One task per box: **A**, **B**, then **+ Add another** (or press Enter in the last box).
@@ -40,9 +51,13 @@ Settings → **Export Markdown** saves a file like:
 - [x] Finished task
 ```
 
-Import rules: numbered lines keep their order in the ranked list, `- [x]` lines count as done,
-bullets and plain lines go into the sort queue. Headings and duplicates are skipped.
-"Add to my list" puts numbered lines below the current list.
+When there are any, the export also has `## Still to sort`, `## Not decided yet` and `## Later` sections.
+
+Import rules: numbered lines keep their order in today's list, `- [x]` lines count as done, lines under
+`## Later` go to the Later list, lines under `## Still to sort` go straight into the sort, and any other
+bullets or plain lines are asked "today or later?" first. Duplicates are skipped.
+"Add to my list" puts numbered lines below the current list; a task that is done (or to do) in the file
+but open (or later) in the app takes the file's status.
 
 ## Updating the app
 

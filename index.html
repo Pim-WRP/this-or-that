@@ -135,6 +135,15 @@ details li{text-decoration:line-through; padding:3px 0; overflow-wrap:anywhere}
 .first.pop{animation:pop .45s ease}
 @keyframes pop{0%{transform:translateY(16px) scale(.97); opacity:0} 100%{transform:none; opacity:1}}
 
+/* Today or later */
+.tcard{margin:28px 0 22px; min-height:150px; padding:24px 16px; font-size:24px; cursor:default}
+.tri .btn{font-size:20px; padding:16px 22px}
+#sortMore{margin-top:0}
+details ul.later{list-style:none; padding:0}
+details ul.later li{text-decoration:none; display:flex; align-items:center; gap:10px; padding:6px 0; color:var(--ink)}
+details ul.later .t{flex:1}
+.btn.mini{width:auto; margin:0; padding:6px 14px; font-size:14px; flex:none}
+
 /* Settings */
 #s-settings h2{margin:28px 0 6px}
 #s-settings .sub{margin-bottom:14px}
@@ -167,6 +176,22 @@ details li{text-decoration:line-through; padding:3px 0; overflow-wrap:anywhere}
     <button class="btn ghost" id="back" hidden>Back to my list</button>
   </section>
 
+  <!-- Today or later: asked once per new item, before This or That -->
+  <section class="screen" id="s-triage">
+    <div class="progress"><i id="tbar"></i></div>
+    <div class="left" id="tleft"></div>
+    <h1 class="q">Shall I do this today?</h1>
+    <div class="card tcard" id="tcard"><span class="txt"></span></div>
+    <div class="row tri">
+      <button class="btn ghost" id="triLater" type="button">Later</button>
+      <button class="btn" id="triToday" type="button">Today</button>
+    </div>
+    <div class="tools">
+      <button class="btn ghost small" id="triUndo" type="button">Undo</button>
+      <button class="btn ghost small" id="triDrop" type="button">Drop it</button>
+    </div>
+  </section>
+
   <!-- Swiping -->
   <section class="screen" id="s-sort">
     <div class="progress"><i id="bar"></i></div>
@@ -185,6 +210,7 @@ details li{text-decoration:line-through; padding:3px 0; overflow-wrap:anywhere}
       <button class="btn ghost small" id="undo">Undo</button>
       <button class="btn ghost small" id="tie">Can't tell</button>
     </div>
+    <button class="btn ghost small" id="sortMore" type="button">+ Add more</button>
   </section>
 
   <!-- Result -->
@@ -203,6 +229,7 @@ details li{text-decoration:line-through; padding:3px 0; overflow-wrap:anywhere}
       <p class="sub">Add what's next when you're ready.</p>
     </div>
     <details id="doneBox" hidden><summary id="doneSum"></summary><ul id="doneList"></ul></details>
+    <details id="laterBox" hidden open><summary id="laterSum"></summary><ul class="later" id="laterList"></ul></details>
     <div class="row">
       <button class="btn" id="more">Add more</button>
       <button class="btn ghost" id="fresh">Start fresh</button>
@@ -240,13 +267,15 @@ details li{text-decoration:line-through; padding:3px 0; overflow-wrap:anywhere}
     return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
   }
   function uid(){ return Math.random().toString(36).slice(2,9) + Date.now().toString(36); }
-  function blank(){ return {ranked:[], done:[], queue:[], cur:null, hist:[], compares:0, streak:{last:null, count:0}, screen:'dump'}; }
+  function blank(){ return {ranked:[], done:[], queue:[], cur:null, hist:[], compares:0, streak:{last:null, count:0}, screen:'dump', later:[], tri:null}; }
 
   var S = null;
   try { var raw = localStorage.getItem(KEY); if (raw) S = JSON.parse(raw); } catch(e) {}
   if (!S || !Array.isArray(S.ranked)) S = blank();
   S.done = (S.done || []).filter(function(d){ return d.day === dayStr(0); });
+  S.later = S.later || []; S.tri = S.tri || null;
   if (S.screen === 'sort' && !S.cur) S.screen = S.ranked.length ? 'result' : 'dump';
+  if (S.screen === 'triage' && !S.tri) S.screen = S.ranked.length ? 'result' : 'dump';
 
   function save(){ try { localStorage.setItem(KEY, JSON.stringify(S)); } catch(e) {} }
 
@@ -318,6 +347,54 @@ details li{text-decoration:line-through; padding:3px 0; overflow-wrap:anywhere}
     S.screen = 'result'; save(); render(true);
   }
 
+  // ---- Today or later: one question per new item; only Today items go into This or That ----
+  function staleLater(){ var t = dayStr(0); return S.later.filter(function(x){ return x.day !== t; }); }
+
+  // Back to swiping if anything is waiting, otherwise to the list.
+  function resume(){
+    if (S.cur || S.queue.length) next();
+    else { S.screen = 'result'; save(); render(); }
+  }
+
+  function startTriage(items){
+    // Later items from an earlier day come up again
+    var stale = staleLater();
+    S.later = S.later.filter(function(x){ return stale.indexOf(x) < 0; });
+    items = items.concat(stale.map(function(x){ return {id:x.id, text:x.text}; }));
+    if (!items.length){ resume(); return; }
+    S.tri = {items:items, i:0, out:[]};
+    S.screen = 'triage'; save(); render();
+  }
+
+  // Commit the answers given so far; returns the items still unanswered.
+  function settleTriage(){
+    if (!S.tri) return [];
+    var t = dayStr(0), tri = S.tri; S.tri = null;
+    tri.out.forEach(function(choice, k){
+      var it = tri.items[k];
+      if (choice === 'today') S.queue.push(it);
+      else if (choice === 'later') S.later.push({id:it.id, text:it.text, day:t});
+    });
+    return tri.items.slice(tri.out.length);
+  }
+
+  function triPick(choice){
+    if (!S.tri) return;
+    S.tri.out.push(choice);
+    if (S.tri.out.length < S.tri.items.length){ save(); render(); return; }
+    settleTriage(); next();
+  }
+  function triUndo(){ if (S.tri && S.tri.out.length){ S.tri.out.pop(); save(); render(); } }
+
+  function laterToToday(id){
+    var i = S.later.findIndex(function(x){ return x.id === id; });
+    if (i < 0) return;
+    var x = S.later.splice(i, 1)[0];
+    S.queue.push({id:x.id, text:x.text});
+    S.hist = []; if (!S.cur) S.compares = 0;
+    next();
+  }
+
   // ---- Views ----
   function sideItems(){
     var opp = S.ranked[mid()];
@@ -329,7 +406,7 @@ details li{text-decoration:line-through; padding:3px 0; overflow-wrap:anywhere}
   var settingsOpen = false;   // not saved: the app always reopens on your list
 
   function render(celebrate){
-    ['dump','sort','result'].forEach(function(k){ $('s-' + k).classList.toggle('on', !settingsOpen && S.screen === k); });
+    ['dump','triage','sort','result'].forEach(function(k){ $('s-' + k).classList.toggle('on', !settingsOpen && S.screen === k); });
     $('s-settings').classList.toggle('on', settingsOpen);
     $('gear').setAttribute('aria-expanded', settingsOpen ? 'true' : 'false');
 
@@ -338,11 +415,22 @@ details li{text-decoration:line-through; padding:3px 0; overflow-wrap:anywhere}
     $('streak').textContent = (active && st.count >= 2) ? st.count + ' days in a row' : (st.last === dayStr(0) ? 'Sorted today' : '');
 
     if (S.screen === 'dump'){
-      var open = S.ranked.length;
-      $('carry').hidden = !open;
-      $('carry').textContent = open ? 'Your ' + open + ' open ' + (open === 1 ? 'item stays' : 'items stay') + ' in order. New ones get sorted in.' : '';
-      $('back').hidden = !open;
+      var open = S.ranked.length, stale = staleLater().length, sorting = !!(S.cur || S.queue.length);
+      var carry = open ? 'Your ' + open + ' open ' + (open === 1 ? 'item stays' : 'items stay') + ' in order. New ones get sorted in.' : '';
+      if (stale) carry += (carry ? ' ' : '') + stale + (stale === 1 ? ' item' : ' items') + ' from Later will come up again.';
+      $('carry').hidden = !carry;
+      $('carry').textContent = carry;
+      $('back').hidden = !open && !sorting;
+      $('back').textContent = sorting ? 'Back to sorting' : 'Back to my list';
       updateGo();
+    }
+
+    if (S.screen === 'triage' && S.tri){
+      var ti = S.tri.out.length, tn = S.tri.items.length;
+      $('tbar').style.width = Math.round(100 * ti / tn) + '%';
+      $('tleft').textContent = (ti + 1) + ' of ' + tn;
+      $('tcard').querySelector('.txt').textContent = S.tri.items[ti].text;
+      $('triUndo').disabled = !ti;
     }
 
     if (S.screen === 'sort' && S.cur){
@@ -382,6 +470,17 @@ details li{text-decoration:line-through; padding:3px 0; overflow-wrap:anywhere}
       $('doneSum').textContent = 'Done today (' + S.done.length + ')';
       var ul = $('doneList'); ul.innerHTML = '';
       S.done.forEach(function(d){ var li = document.createElement('li'); li.textContent = d.text; ul.appendChild(li); });
+      $('laterBox').hidden = !S.later.length;
+      $('laterSum').textContent = 'Later (' + S.later.length + ')';
+      var ll = $('laterList'); ll.innerHTML = '';
+      S.later.forEach(function(x){
+        var li = document.createElement('li');
+        var t = document.createElement('span'); t.className = 't'; t.textContent = x.text;
+        var b = document.createElement('button'); b.className = 'btn ghost small mini'; b.type = 'button'; b.textContent = 'Today';
+        b.setAttribute('aria-label', 'Do today: ' + x.text);
+        b.addEventListener('click', function(){ laterToToday(x.id); });
+        li.appendChild(t); li.appendChild(b); ll.appendChild(li);
+      });
       resetFresh();
     }
   }
@@ -504,7 +603,7 @@ details li{text-decoration:line-through; padding:3px 0; overflow-wrap:anywhere}
     });
   }
   function updateGo(){
-    var n = lines().length;
+    var n = lines().length + staleLater().length;
     $('go').disabled = n === 0;
     $('go').textContent = n ? 'Start sorting (' + n + ')' : 'Start sorting';
   }
@@ -529,20 +628,30 @@ details li{text-decoration:line-through; padding:3px 0; overflow-wrap:anywhere}
   setBoxes(Array.isArray(draft) ? draft.filter(function(v){ return typeof v === 'string'; }) : []);
 
   $('go').addEventListener('click', function(){
-    var items = lines(); if (!items.length) return;
-    items.forEach(function(t){ S.queue.push({id:uid(), text:t}); });
+    var items = lines().map(function(t){ return {id:uid(), text:t}; });
+    if (!items.length && !staleLater().length) return;
     setBoxes([]); boxesChanged(); vstatus('');
-    S.hist = []; S.compares = 0;
-    next();
+    // Undo snapshots don't know about the new items, so a paused sort starts a fresh undo history.
+    S.hist = []; if (!S.cur) S.compares = 0;
+    startTriage(items);
   });
-  $('back').addEventListener('click', function(){ S.screen = 'result'; save(); render(); });
+  $('back').addEventListener('click', resume);
+
+  // Add more, from the list or in the middle of sorting (the sort waits where it was).
+  function addMore(){
+    S.screen = 'dump'; save(); render(); window.scrollTo(0, 0);
+    setTimeout(function(){ var all = inputs(); (all.filter(function(i){ return !i.value.trim(); })[0] || all[0]).focus(); }, 50);
+  }
+  $('sortMore').addEventListener('click', addMore);
+
+  $('triToday').addEventListener('click', function(){ triPick('today'); });
+  $('triLater').addEventListener('click', function(){ triPick('later'); });
+  $('triDrop').addEventListener('click', function(){ triPick('drop'); });
+  $('triUndo').addEventListener('click', triUndo);
 
   // ---- Result actions ----
   $('firstDone').addEventListener('click', function(){ if (S.ranked[0]) markDone(S.ranked[0].id); });
-  $('more').addEventListener('click', function(){
-    S.screen = 'dump'; save(); render();
-    setTimeout(function(){ var all = inputs(); (all.filter(function(i){ return !i.value.trim(); })[0] || all[0]).focus(); }, 50);
-  });
+  $('more').addEventListener('click', addMore);
   var freshTimer = null;
   function resetFresh(){ clearTimeout(freshTimer); $('fresh').textContent = 'Start fresh'; $('fresh').dataset.armed = ''; }
   $('fresh').addEventListener('click', function(){
@@ -609,7 +718,14 @@ details li{text-decoration:line-through; padding:3px 0; overflow-wrap:anywhere}
   arena.addEventListener('pointercancel', function(){ down = false; moved = false; arena.classList.remove('dragging'); beam.style.transform = ''; });
 
   document.addEventListener('keydown', function(e){
-    if (settingsOpen || S.screen !== 'sort' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'INPUT') return;
+    if (settingsOpen || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'INPUT') return;
+    if (S.screen === 'triage'){
+      if (e.key === 'ArrowLeft') triPick('later');
+      else if (e.key === 'ArrowRight') triPick('today');
+      else if (e.key === 'u' || e.key === 'U') triUndo();
+      return;
+    }
+    if (S.screen !== 'sort') return;
     if (e.key === 'ArrowLeft') choose('left');
     else if (e.key === 'ArrowRight') choose('right');
     else if (e.key === 'u' || e.key === 'U') undo();
@@ -629,12 +745,21 @@ details li{text-decoration:line-through; padding:3px 0; overflow-wrap:anywhere}
   function iostatus(t){ $('iostatus').textContent = t || ''; }
 
   function toMarkdown(){
+    var tri = S.tri || {items:[], out:[]};
+    function answered(c){ return tri.items.filter(function(it, k){ return tri.out[k] === c; }); }
+    function section(title, items, mark){
+      if (!items.length) return;
+      md.push('', '## ' + title);
+      items.forEach(function(it){ md.push(mark + it.text); });
+    }
     var md = ['# This or That (' + dayStr(0) + ')', '', '## To do'];
     S.ranked.forEach(function(it, i){ md.push((i + 1) + '. ' + it.text); });
-    // Mid-sort items are not ranked yet; as bullets they go back into the sort queue on import.
-    var unsorted = (S.cur ? [S.cur.item] : []).concat(S.queue);
-    if (unsorted.length){ md.push('', '## Still to sort'); unsorted.forEach(function(it){ md.push('- ' + it.text); }); }
-    if (S.done.length){ md.push('', '## Done today'); S.done.forEach(function(d){ md.push('- [x] ' + d.text); }); }
+    // Marked Today but not ranked yet: on import they go straight back into the sort.
+    section('Still to sort', (S.cur ? [S.cur.item] : []).concat(S.queue, answered('today')), '- ');
+    // Not asked "today or later?" yet: on import they're asked again.
+    section('Not decided yet', tri.items.slice(tri.out.length), '- ');
+    section('Later', S.later.concat(answered('later')), '- ');
+    section('Done today', S.done, '- [x] ');
     return md.join('\n') + '\n';
   }
 
@@ -659,16 +784,25 @@ details li{text-decoration:line-through; padding:3px 0; overflow-wrap:anywhere}
   });
 
   // ---- Markdown import ----
-  // "1." lines keep their order, "- [x]" lines are done, bullets and plain lines get sorted in.
+  // "1." lines keep their order, "- [x]" lines are done, lines under "## Later" stay later,
+  // lines under "## Still to sort" go straight into the sort, and other bullets or plain lines
+  // are asked "today or later?" first.
   function parseMarkdown(text){
-    var out = {ranked:[], done:[], queue:[]}, seen = {};
-    text.replace(/^﻿/, '').split(/\r?\n/).forEach(function(raw){
+    var out = {ranked:[], done:[], queue:[], later:[], ask:[]}, seen = {}, section = null;
+    text.replace(/^\uFEFF/, '').split(/\r?\n/).forEach(function(raw){
       var s = raw.trim(), m, list;
-      if (!s || /^#{1,6}(\s|$)/.test(s) || /^(\d+[.)]|[-*+])$/.test(s)) return;
+      if ((m = s.match(/^#{1,6}(?:\s+(.*))?$/))){
+        var h = (m[1] || '').trim();
+        section = /^later\b/i.test(h) ? 'later' : /^still to sort\b/i.test(h) ? 'queue' : null;
+        return;
+      }
+      if (!s || /^(\d+[.)]|[-*+])$/.test(s)) return;
       if ((m = s.match(/^(?:[-*+]|\d+[.)])\s+\[[xX]\](?:\s+(.*))?$/))){ list = out.done; s = m[1] || ''; }
-      else if ((m = s.match(/^\d+[.)]\s+(?:\[ \]\s+)?(.*)$/))){ list = out.ranked; s = m[1]; }
-      else if ((m = s.match(/^[-*+]\s+(?:\[ \]\s+)?(.*)$/))){ list = out.queue; s = m[1]; }
-      else list = out.queue;
+      else if ((m = s.match(/^\d+[.)]\s+(?:\[ \]\s+)?(.*)$/))){ list = section === 'later' ? out.later : out.ranked; s = m[1]; }
+      else {
+        if ((m = s.match(/^[-*+]\s+(?:\[ \]\s+)?(.*)$/))) s = m[1];
+        list = out[section || 'ask'];
+      }
       s = s.trim();
       var k = s.toLowerCase();
       if (!/[\p{L}\p{N}]/u.test(s) || seen[k]) return;   // skips rules like --- and repeats
@@ -691,31 +825,38 @@ details li{text-decoration:line-through; padding:3px 0; overflow-wrap:anywhere}
     var text = '';
     try { text = await f.text(); } catch(e){ iostatus("Couldn't read that file."); return; }
     var p = parseMarkdown(text);
-    if (!p.ranked.length && !p.queue.length && !p.done.length){ iostatus('No tasks found in ' + f.name + '.'); return; }
+    var total = p.ranked.length + p.queue.length + p.ask.length + p.later.length + p.done.length;
+    if (!total){ iostatus('No tasks found in ' + f.name + '.'); return; }
     var parts = [];
     if (p.ranked.length) parts.push(p.ranked.length + ' in order');
     if (p.queue.length) parts.push(p.queue.length + ' to sort');
+    if (p.ask.length) parts.push(p.ask.length + ' new');
+    if (p.later.length) parts.push(p.later.length + ' later');
     if (p.done.length) parts.push(p.done.length + ' done');
     pending = p;
-    $('importInfo').textContent = f.name + ': ' + plural(p.ranked.length + p.queue.length + p.done.length, 'task', 'tasks') + ' (' + parts.join(', ') + ').';
+    $('importInfo').textContent = f.name + ': ' + plural(total, 'task', 'tasks') + ' (' + parts.join(', ') + ').';
     $('importAsk').hidden = false; iostatus('');
   });
 
   function applyImport(mode){
     var p = pending; if (!p) return;
-    var today = dayStr(0);
+    var today = dayStr(0), ask;
     function item(t){ return {id:uid(), text:t}; }
+    function laterItem(t){ return {id:uid(), text:t, day:today}; }
     function key(t){ return t.toLowerCase(); }
     if (mode === 'replace'){
       var keep = S.streak; S = blank(); S.streak = keep;
       S.ranked = p.ranked.map(item);
       S.queue = p.queue.map(item);
+      S.later = p.later.map(laterItem);
       S.done = p.done.map(function(t){ return {id:uid(), text:t, day:today}; });
+      ask = p.ask.map(item);
     } else {
+      ask = settleTriage();   // answers given so far are kept; unanswered items are asked again
       // An item mid-sort starts its comparisons again, so removing done items below can't break its bounds.
       if (S.cur){ S.queue.unshift(S.cur.item); S.cur = null; }
       var seen = {};
-      S.ranked.concat(S.queue).forEach(function(it){ seen[key(it.text)] = 1; });
+      S.ranked.concat(S.queue, S.later, ask).forEach(function(it){ seen[key(it.text)] = 1; });
       S.done.forEach(function(d){ seen[key(d.text)] = 2; });
       p.done.forEach(function(t){
         var k = key(t);
@@ -723,22 +864,31 @@ details li{text-decoration:line-through; padding:3px 0; overflow-wrap:anywhere}
         // Open here but done in the file: it counts as done.
         var keepOpen = function(it){ return key(it.text) !== k; };
         S.ranked = S.ranked.filter(keepOpen); S.queue = S.queue.filter(keepOpen);
+        S.later = S.later.filter(keepOpen); ask = ask.filter(keepOpen);
         S.done.push({id:uid(), text:t, day:today}); seen[k] = 2;
       });
+      // Later here but to do in the file: it moves up.
+      p.ranked.concat(p.queue).forEach(function(t){
+        var k = key(t), n = S.later.length;
+        S.later = S.later.filter(function(x){ return key(x.text) !== k; });
+        if (S.later.length < n) delete seen[k];
+      });
+      var add = function(list, make){ return function(t){ if (!seen[key(t)]){ seen[key(t)] = 1; list.push(make(t)); } }; };
       // Numbered lines go below the current list, in file order.
-      p.ranked.forEach(function(t){ if (!seen[key(t)]){ seen[key(t)] = 1; S.ranked.push(item(t)); } });
-      p.queue.forEach(function(t){ if (!seen[key(t)]){ seen[key(t)] = 1; S.queue.push(item(t)); } });
+      p.ranked.forEach(add(S.ranked, item));
+      p.queue.forEach(add(S.queue, item));
+      p.later.forEach(add(S.later, laterItem));
+      p.ask.forEach(add(ask, item));
     }
     S.hist = []; S.compares = 0;
     settingsOpen = false; resetImport();
     window.scrollTo(0, 0);
-    if (S.queue.length) next();   // straight into swiping
-    else { S.screen = 'result'; save(); render(); }
+    startTriage(ask);   // "today or later?" for new lines, then sorting, or straight to the list
   }
   $('impAdd').addEventListener('click', function(){ applyImport('add'); });
   $('impReplace').addEventListener('click', function(){
     var b = $('impReplace');
-    var hasList = S.ranked.length || S.queue.length || S.cur || S.done.length;
+    var hasList = S.ranked.length || S.queue.length || S.cur || S.done.length || S.later.length || S.tri;
     if (!hasList || b.dataset.armed){ applyImport('replace'); return; }
     b.dataset.armed = '1'; b.textContent = 'Tap again to replace';
     replaceTimer = setTimeout(resetReplace, 3000);

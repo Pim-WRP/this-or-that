@@ -1,6 +1,6 @@
 // Offline cache for This or That.
 // Bump VERSION whenever any file below changes; phones pick up the new version on their next launch.
-var VERSION = 'this-or-that-v2';
+var VERSION = 'this-or-that-v3';
 var FILES = [
   './',
   'index.html',
