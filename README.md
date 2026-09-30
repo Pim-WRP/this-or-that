@@ -2,7 +2,7 @@
 
 Mind dump, then sort your tasks two at a time. An installable web app (PWA) that works offline.
 
-**Open it:** https://mrswarffamousthepimmigrant.github.io/this-or-that/
+**Open it:** https://pim-wrp.github.io/this-or-that/
 
 ## Install on your phone
 
