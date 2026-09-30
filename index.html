@@ -4,10 +4,24 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>This or That</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&display=swap" rel="stylesheet">
+<meta name="description" content="Get it all out, then sort it two at a time.">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<meta name="theme-color" content="#E9ECFF" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#14162B" media="(prefers-color-scheme: dark)">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="This or That">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
 <style>
+/* Fonts are bundled so the app works offline and never calls Google. Both are SIL OFL 1.1 (see fonts/). */
+@font-face{font-family:'Atkinson Hyperlegible'; font-style:normal; font-weight:400; font-display:swap; src:url(fonts/atkinson-400-latin-ext.woff2) format('woff2'); unicode-range:U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF}
+@font-face{font-family:'Atkinson Hyperlegible'; font-style:normal; font-weight:400; font-display:swap; src:url(fonts/atkinson-400-latin.woff2) format('woff2'); unicode-range:U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD}
+@font-face{font-family:'Atkinson Hyperlegible'; font-style:normal; font-weight:700; font-display:swap; src:url(fonts/atkinson-700-latin-ext.woff2) format('woff2'); unicode-range:U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF}
+@font-face{font-family:'Atkinson Hyperlegible'; font-style:normal; font-weight:700; font-display:swap; src:url(fonts/atkinson-700-latin.woff2) format('woff2'); unicode-range:U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD}
+@font-face{font-family:'Bricolage Grotesque'; font-style:normal; font-weight:600 800; font-display:swap; src:url(fonts/bricolage-latin-ext.woff2) format('woff2'); unicode-range:U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF}
+@font-face{font-family:'Bricolage Grotesque'; font-style:normal; font-weight:600 800; font-display:swap; src:url(fonts/bricolage-latin.woff2) format('woff2'); unicode-range:U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD}
 :root{
   --bg:#E9ECFF; --ink:#1B1E3C; --muted:#5C618C; --card:#FFFFFF; --line:#C9CEF0;
   --soft:#DCE0FB; --win:#F2B632; --win-ink:#3A2A00; --drop:#C93C52;
@@ -40,6 +54,10 @@ h1,h2,.display{
 .top{display:flex; justify-content:space-between; align-items:center; min-height:32px}
 .brand{font-family:'Bricolage Grotesque', system-ui, sans-serif; font-weight:800; font-size:18px}
 .streak{font-size:14px; color:var(--muted)}
+.top-r{display:flex; align-items:center; gap:2px}
+.gear{appearance:none; border:0; background:transparent; color:var(--muted); width:40px; height:40px; margin:-4px -10px -4px 0; border-radius:50%; display:grid; place-items:center; cursor:pointer}
+.gear:hover, .gear[aria-expanded="true"]{color:var(--ink)}
+.gear svg{width:22px; height:22px}
 .screen{display:none}
 .screen.on{display:block}
 h1{font-size:40px; font-weight:800; margin:22px 0 8px}
@@ -117,6 +135,13 @@ details li{text-decoration:line-through; padding:3px 0; overflow-wrap:anywhere}
 .row .btn{flex:1}
 .first.pop{animation:pop .45s ease}
 @keyframes pop{0%{transform:translateY(16px) scale(.97); opacity:0} 100%{transform:none; opacity:1}}
+
+/* Settings */
+#s-settings h2{margin:28px 0 6px}
+#s-settings .sub{margin-bottom:14px}
+.field{width:100%; border:2px solid var(--line); border-radius:14px; background:var(--card); color:var(--ink); padding:12px 16px; font:inherit; margin-bottom:10px}
+.field::placeholder{color:var(--muted); opacity:.7}
+.vh{position:absolute; width:1px; height:1px; opacity:0; pointer-events:none}
 @media (prefers-reduced-motion: reduce){*{transition:none !important; animation:none !important}}
 </style>
 </head>
@@ -124,7 +149,10 @@ details li{text-decoration:line-through; padding:3px 0; overflow-wrap:anywhere}
 <main>
   <div class="top">
     <span class="brand">This or That</span>
-    <span class="streak" id="streak"></span>
+    <span class="top-r">
+      <span class="streak" id="streak"></span>
+      <button class="gear" id="gear" type="button" aria-label="Settings" aria-expanded="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" fill-rule="evenodd" d="M19.3 10.0L22.1 10.3L22.1 13.7L19.3 14.0L18.6 15.8L20.3 17.9L17.9 20.3L15.8 18.6L14.0 19.3L13.7 22.1L10.3 22.1L10.0 19.3L8.2 18.6L6.1 20.3L3.7 17.9L5.4 15.8L4.7 14.0L1.9 13.7L1.9 10.3L4.7 10.0L5.4 8.2L3.7 6.1L6.1 3.7L8.2 5.4L10.0 4.7L10.3 1.9L13.7 1.9L14.0 4.7L15.8 5.4L17.9 3.7L20.3 6.1L18.6 8.2Z M15.2 12a3.2 3.2 0 1 0-6.4 0a3.2 3.2 0 1 0 6.4 0Z"/></svg></button>
+    </span>
   </div>
 
   <!-- Mind dump -->
@@ -182,6 +210,35 @@ details li{text-decoration:line-through; padding:3px 0; overflow-wrap:anywhere}
       <button class="btn" id="more">Add more</button>
       <button class="btn ghost" id="fresh">Start fresh</button>
     </div>
+  </section>
+
+  <!-- Settings -->
+  <section class="screen" id="s-settings">
+    <h1>Settings</h1>
+    <p class="sub">Everything stays on this phone.</p>
+
+    <h2>Your list as a file</h2>
+    <p class="sub">Save a Markdown copy as a backup, or load one you edited.</p>
+    <button class="btn" id="exportBtn" type="button">Export Markdown</button>
+    <button class="btn ghost" id="importBtn" type="button">Import Markdown</button>
+    <input type="file" id="importFile" class="vh" tabindex="-1" aria-hidden="true">
+    <div id="importAsk" hidden>
+      <div class="note" id="importInfo"></div>
+      <button class="btn" id="impAdd" type="button">Add to my list</button>
+      <button class="btn ghost" id="impReplace" type="button">Replace my list</button>
+    </div>
+    <div class="status" id="iostatus" aria-live="polite"></div>
+
+    <h2>Claude (optional)</h2>
+    <p class="sub">Paste an Anthropic API key and "Make it a list" will use Claude to pull the tasks out of what you said. The key is kept only on this phone and sent only to Anthropic. Without a key, the app splits the text itself.</p>
+    <input class="field" id="apikey" type="text" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="sk-ant-…" aria-label="Anthropic API key">
+    <div class="row">
+      <button class="btn small" id="keySave" type="button">Save key</button>
+      <button class="btn ghost small" id="keyClear" type="button">Remove key</button>
+    </div>
+    <div class="status" id="keystatus" aria-live="polite"></div>
+
+    <button class="btn ghost" id="setBack" type="button">Back</button>
   </section>
 </main>
 
@@ -281,8 +338,12 @@ details li{text-decoration:line-through; padding:3px 0; overflow-wrap:anywhere}
     return S.cur.flip ? [o, n] : [n, o];
   }
 
+  var settingsOpen = false;   // not saved: the app always reopens on your list
+
   function render(celebrate){
-    ['dump','sort','result'].forEach(function(k){ $('s-' + k).classList.toggle('on', S.screen === k); });
+    ['dump','sort','result'].forEach(function(k){ $('s-' + k).classList.toggle('on', !settingsOpen && S.screen === k); });
+    $('s-settings').classList.toggle('on', settingsOpen);
+    $('gear').setAttribute('aria-expanded', settingsOpen ? 'true' : 'false');
 
     var st = S.streak;
     var active = st.last === dayStr(0) || st.last === dayStr(-1);
@@ -361,11 +422,13 @@ details li{text-decoration:line-through; padding:3px 0; overflow-wrap:anywhere}
   // ---- Voice + tidy into a list ----
   var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
   var rec = null, listening = false, tidying = false, heard = false, base = '';
-  var samplePromise = (window.claude && window.claude.use) ? window.claude.use('sample').catch(function(){ return null; }) : Promise.resolve(null);
   var MIC_OFF = "The microphone isn't available here. Tap the mic on your keyboard instead.";
-  function vstatus(t){ $('vstatus').textContent = t || ''; }
+  var micOff = !SR;
+  // Once the mic is unavailable, the keyboard-dictation hint is the resting status.
+  function vstatus(t){ $('vstatus').textContent = t || (micOff ? MIC_OFF : ''); }
+  function micUnavailable(){ micOff = true; $('mic').hidden = true; vstatus(MIC_OFF); }
 
-  if (SR){ $('mic').hidden = false; }
+  if (SR){ $('mic').hidden = false; } else vstatus('');
   $('mic').addEventListener('click', function(){ listening ? stopMic() : startMic(); });
 
   function startMic(){
@@ -387,7 +450,7 @@ details li{text-decoration:line-through; padding:3px 0; overflow-wrap:anywhere}
       };
       rec.onerror = function(e){
         if (e.error === 'not-allowed' || e.error === 'service-not-allowed' || e.error === 'audio-capture'){
-          vstatus(MIC_OFF); $('mic').hidden = true;
+          micUnavailable();
         } else if (e.error !== 'no-speech' && e.error !== 'aborted'){
           vstatus('Voice stopped (' + e.error + '). Tap Talk to try again.');
         }
@@ -403,7 +466,7 @@ details li{text-decoration:line-through; padding:3px 0; overflow-wrap:anywhere}
       vstatus('Listening. Say everything, then tap Done talking.');
       updateGo();
     } catch(err){
-      vstatus(MIC_OFF); $('mic').hidden = true;
+      micUnavailable();
     }
   }
   function stopMic(){ try { rec && rec.stop(); } catch(e){} }
@@ -420,6 +483,64 @@ details li{text-decoration:line-through; padding:3px 0; overflow-wrap:anywhere}
       .map(function(s){ return s.charAt(0).toUpperCase() + s.slice(1); });
   }
 
+  // ---- Optional Claude call: only with the user's own key; any failure falls back to localSplit ----
+  var API_KEY = 'this-or-that-apikey', API_ERR = 'this-or-that-apierr';
+  var MODEL = 'claude-haiku-4-5';
+  function getKey(){ try { return localStorage.getItem(API_KEY) || ''; } catch(e){ return ''; } }
+  function noteApi(err){ try { err ? localStorage.setItem(API_ERR, err) : localStorage.removeItem(API_ERR); } catch(e){} }
+
+  function parseJsonLoose(s){
+    try { return JSON.parse(s); } catch(e){}
+    var m = s.match(/\{[\s\S]*\}|\[[\s\S]*\]/);
+    return m ? JSON.parse(m[0]) : null;
+  }
+
+  async function claudeTasks(text){
+    var key = getKey();
+    if (!key) return null;
+    var prompt =
+      'You turn a spoken or typed brain dump into a to-do list.\n' +
+      'Rules:\n' +
+      '- One entry per distinct task or errand.\n' +
+      '- Short, starting with a verb where natural (e.g. "Call the dentist").\n' +
+      "- Keep the speaker's own words and language; do not translate.\n" +
+      '- Keep specifics: names, dates, amounts, places.\n' +
+      '- Drop filler, feelings and commentary that are not tasks.\n' +
+      '- Do not invent tasks. Merge duplicates.\n' +
+      '- Lines that are already short tasks stay as they are.\n' +
+      'Return only JSON in this shape: {"tasks": ["...", "..."]}\n\n' +
+      'Brain dump (between the markers):\n<<<\n' + text + '\n>>>';
+    var ctrl = new AbortController();
+    var timer = setTimeout(function(){ ctrl.abort(); }, 20000);
+    try {
+      var res = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST', signal: ctrl.signal,
+        headers: {
+          'content-type': 'application/json',
+          'x-api-key': key,
+          'anthropic-version': '2023-06-01',
+          'anthropic-dangerous-direct-browser-access': 'true'
+        },
+        body: JSON.stringify({model: MODEL, max_tokens: 4096, messages: [{role: 'user', content: prompt}]})
+      });
+      var data = await res.json().catch(function(){ return null; });
+      if (!res.ok) throw new Error((data && data.error && data.error.message) || ('HTTP ' + res.status));
+      var reply = ((data && data.content) || []).filter(function(b){ return b.type === 'text'; }).map(function(b){ return b.text; }).join('');
+      var out = parseJsonLoose(reply);
+      var arr = Array.isArray(out) ? out : (out && out.tasks);
+      if (!Array.isArray(arr)) throw new Error("Claude's reply wasn't a list");
+      return arr.filter(function(x){ return typeof x === 'string' && x.trim(); }).map(function(x){ return x.trim(); });
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
+  function apiErrText(e){
+    if (e && e.name === 'AbortError') return 'Claude took too long to answer.';
+    if (e instanceof TypeError) return 'Could not reach Claude (offline?).';
+    return (e && e.message) || 'Unknown error.';
+  }
+
   async function tidy(){
     var text = $('dump').value.trim();
     if (!text || tidying) return;
@@ -428,25 +549,9 @@ details li{text-decoration:line-through; padding:3px 0; overflow-wrap:anywhere}
     vstatus('Turning that into separate tasks…');
     var tasks = null;
     try {
-      var sample = await samplePromise;
-      if (sample){
-        var prompt =
-          'You turn a spoken or typed brain dump into a to-do list.\n' +
-          'Rules:\n' +
-          '- One entry per distinct task or errand.\n' +
-          '- Short, starting with a verb where natural (e.g. "Call the dentist").\n' +
-          "- Keep the speaker's own words and language; do not translate.\n" +
-          '- Keep specifics: names, dates, amounts, places.\n' +
-          '- Drop filler, feelings and commentary that are not tasks.\n' +
-          '- Do not invent tasks. Merge duplicates.\n' +
-          '- Lines that are already short tasks stay as they are.\n' +
-          'Return only JSON in this shape: {"tasks": ["...", "..."]}\n\n' +
-          'Brain dump (between the markers):\n<<<\n' + text + '\n>>>';
-        var out = await sample.json(prompt, {modelTier: 'quick', cache: false});
-        var arr = Array.isArray(out) ? out : (out && out.tasks);
-        if (Array.isArray(arr)) tasks = arr.filter(function(x){ return typeof x === 'string' && x.trim(); }).map(function(x){ return x.trim(); });
-      }
-    } catch(e){ tasks = null; }
+      tasks = await claudeTasks(text);
+      if (tasks) noteApi('');
+    } catch(e){ tasks = null; noteApi(apiErrText(e)); }
     var usedLocal = !tasks || !tasks.length;
     if (usedLocal) tasks = localSplit(text);
     $('dump').value = tasks.join('\n');
@@ -534,13 +639,165 @@ details li{text-decoration:line-through; padding:3px 0; overflow-wrap:anywhere}
   arena.addEventListener('pointercancel', function(){ down = false; moved = false; arena.classList.remove('dragging'); beam.style.transform = ''; });
 
   document.addEventListener('keydown', function(e){
-    if (S.screen !== 'sort' || e.target.tagName === 'TEXTAREA') return;
+    if (settingsOpen || S.screen !== 'sort' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'INPUT') return;
     if (e.key === 'ArrowLeft') choose('left');
     else if (e.key === 'ArrowRight') choose('right');
     else if (e.key === 'u' || e.key === 'U') undo();
   });
 
+  // ---- Settings ----
+  function openSettings(on){
+    settingsOpen = on;
+    if (on){ showKeyStatus(); resetImport(); iostatus(''); }
+    render();
+    window.scrollTo(0, 0);
+  }
+  $('gear').addEventListener('click', function(){ openSettings(!settingsOpen); });
+  $('setBack').addEventListener('click', function(){ openSettings(false); });
+
+  function showKeyStatus(){
+    var k = getKey(), err = '';
+    try { err = localStorage.getItem(API_ERR) || ''; } catch(e){}
+    $('keystatus').textContent = k
+      ? 'Key saved on this phone (ends in …' + k.slice(-4) + ').' + (err ? " Last try didn't work (" + err.replace(/[.\s]+$/, '') + '), so the app split the text itself.' : '')
+      : 'No key saved.';
+    $('keyClear').disabled = !k;
+  }
+  $('keySave').addEventListener('click', function(){
+    var k = $('apikey').value.trim();
+    if (!k){ $('keystatus').textContent = 'Paste your key first.'; return; }
+    try { localStorage.setItem(API_KEY, k); } catch(e){}
+    noteApi(''); $('apikey').value = ''; showKeyStatus();
+  });
+  $('keyClear').addEventListener('click', function(){
+    try { localStorage.removeItem(API_KEY); } catch(e){}
+    noteApi(''); showKeyStatus();
+  });
+
+  // ---- Markdown export ----
+  function iostatus(t){ $('iostatus').textContent = t || ''; }
+
+  function toMarkdown(){
+    var md = ['# This or That (' + dayStr(0) + ')', '', '## To do'];
+    S.ranked.forEach(function(it, i){ md.push((i + 1) + '. ' + it.text); });
+    // Mid-sort items are not ranked yet; as bullets they go back into the sort queue on import.
+    var unsorted = (S.cur ? [S.cur.item] : []).concat(S.queue);
+    if (unsorted.length){ md.push('', '## Still to sort'); unsorted.forEach(function(it){ md.push('- ' + it.text); }); }
+    if (S.done.length){ md.push('', '## Done today'); S.done.forEach(function(d){ md.push('- [x] ' + d.text); }); }
+    return md.join('\n') + '\n';
+  }
+
+  // Home-screen apps on iPhone can't reliably download; the share sheet has "Save to Files".
+  var isIOS = /iP(hone|od|ad)/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+
+  $('exportBtn').addEventListener('click', async function(){
+    var name = 'this-or-that-' + dayStr(0) + '.md', text = toMarkdown();
+    if (isIOS && navigator.canShare){
+      var file = new File([text], name, {type: 'text/markdown'});
+      if (navigator.canShare({files: [file]})){
+        try { await navigator.share({files: [file]}); iostatus('Shared ' + name + '.'); }
+        catch(e){ if (e.name !== 'AbortError') iostatus("Couldn't share the file (" + e.message + ')'); }
+        return;
+      }
+    }
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([text], {type: 'text/markdown'}));
+    a.download = name; document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(function(){ URL.revokeObjectURL(a.href); }, 10000);
+    iostatus('Saved ' + name + ' to your downloads.');
+  });
+
+  // ---- Markdown import ----
+  // "1." lines keep their order, "- [x]" lines are done, bullets and plain lines get sorted in.
+  function parseMarkdown(text){
+    var out = {ranked:[], done:[], queue:[]}, seen = {};
+    text.replace(/^﻿/, '').split(/\r?\n/).forEach(function(raw){
+      var s = raw.trim(), m, list;
+      if (!s || /^#{1,6}(\s|$)/.test(s) || /^(\d+[.)]|[-*+])$/.test(s)) return;
+      if ((m = s.match(/^(?:[-*+]|\d+[.)])\s+\[[xX]\](?:\s+(.*))?$/))){ list = out.done; s = m[1] || ''; }
+      else if ((m = s.match(/^\d+[.)]\s+(?:\[ \]\s+)?(.*)$/))){ list = out.ranked; s = m[1]; }
+      else if ((m = s.match(/^[-*+]\s+(?:\[ \]\s+)?(.*)$/))){ list = out.queue; s = m[1]; }
+      else list = out.queue;
+      s = s.trim();
+      var k = s.toLowerCase();
+      if (!/[\p{L}\p{N}]/u.test(s) || seen[k]) return;   // skips rules like --- and repeats
+      seen[k] = 1; list.push(s);
+    });
+    return out;
+  }
+
+  var pending = null, replaceTimer = null;
+  function plural(n, one, many){ return n + ' ' + (n === 1 ? one : many); }
+  function resetReplace(){ clearTimeout(replaceTimer); $('impReplace').textContent = 'Replace my list'; $('impReplace').dataset.armed = ''; }
+  function resetImport(){ pending = null; $('importAsk').hidden = true; resetReplace(); }
+
+  $('importBtn').addEventListener('click', function(){ $('importFile').click(); });
+  $('importFile').addEventListener('change', async function(){
+    var f = this.files && this.files[0];
+    this.value = '';   // so picking the same file again still fires change
+    if (!f) return;
+    resetImport();
+    var text = '';
+    try { text = await f.text(); } catch(e){ iostatus("Couldn't read that file."); return; }
+    var p = parseMarkdown(text);
+    if (!p.ranked.length && !p.queue.length && !p.done.length){ iostatus('No tasks found in ' + f.name + '.'); return; }
+    var parts = [];
+    if (p.ranked.length) parts.push(p.ranked.length + ' in order');
+    if (p.queue.length) parts.push(p.queue.length + ' to sort');
+    if (p.done.length) parts.push(p.done.length + ' done');
+    pending = p;
+    $('importInfo').textContent = f.name + ': ' + plural(p.ranked.length + p.queue.length + p.done.length, 'task', 'tasks') + ' (' + parts.join(', ') + ').';
+    $('importAsk').hidden = false; iostatus('');
+  });
+
+  function applyImport(mode){
+    var p = pending; if (!p) return;
+    var today = dayStr(0);
+    function item(t){ return {id:uid(), text:t}; }
+    function key(t){ return t.toLowerCase(); }
+    if (mode === 'replace'){
+      var keep = S.streak; S = blank(); S.streak = keep;
+      S.ranked = p.ranked.map(item);
+      S.queue = p.queue.map(item);
+      S.done = p.done.map(function(t){ return {id:uid(), text:t, day:today}; });
+    } else {
+      // An item mid-sort starts its comparisons again, so removing done items below can't break its bounds.
+      if (S.cur){ S.queue.unshift(S.cur.item); S.cur = null; }
+      var seen = {};
+      S.ranked.concat(S.queue).forEach(function(it){ seen[key(it.text)] = 1; });
+      S.done.forEach(function(d){ seen[key(d.text)] = 2; });
+      p.done.forEach(function(t){
+        var k = key(t);
+        if (seen[k] === 2) return;
+        // Open here but done in the file: it counts as done.
+        var keepOpen = function(it){ return key(it.text) !== k; };
+        S.ranked = S.ranked.filter(keepOpen); S.queue = S.queue.filter(keepOpen);
+        S.done.push({id:uid(), text:t, day:today}); seen[k] = 2;
+      });
+      // Numbered lines go below the current list, in file order.
+      p.ranked.forEach(function(t){ if (!seen[key(t)]){ seen[key(t)] = 1; S.ranked.push(item(t)); } });
+      p.queue.forEach(function(t){ if (!seen[key(t)]){ seen[key(t)] = 1; S.queue.push(item(t)); } });
+    }
+    S.hist = []; S.compares = 0;
+    settingsOpen = false; resetImport();
+    window.scrollTo(0, 0);
+    if (S.queue.length) next();   // straight into swiping
+    else { S.screen = 'result'; save(); render(); }
+  }
+  $('impAdd').addEventListener('click', function(){ applyImport('add'); });
+  $('impReplace').addEventListener('click', function(){
+    var b = $('impReplace');
+    var hasList = S.ranked.length || S.queue.length || S.cur || S.done.length;
+    if (!hasList || b.dataset.armed){ applyImport('replace'); return; }
+    b.dataset.armed = '1'; b.textContent = 'Tap again to replace';
+    replaceTimer = setTimeout(resetReplace, 3000);
+  });
+
   render();
+
+  // ---- Offline + keep data ----
+  if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(function(){});
+  if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(function(){});
 })();
 </script>
 </body>
